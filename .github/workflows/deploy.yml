@@ -61,7 +61,7 @@ jobs:
             --role arn:aws:iam::851725469799:role/service-role/test_function-role-k06sk5ka \
             --handler app.lambda_handler \
             --timeout 300 \
-            --zip-file fileb://$(pwd)/lambda.zip \
+            --zip-file fileb://lambda.zip \
             --region $REGION \
             --environment Variables={$ENV_VARS}
         else
@@ -69,8 +69,25 @@ jobs:
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --zip-file fileb://$(pwd)/lambda.zip
+            --zip-file fileb://lambda.zip
 
+          # Wait for function code update to complete
+          echo "Waiting for function code update to complete..."
+          while true; do
+            UPDATE_STATUS=$(aws lambda get-function --function-name $FUNCTION_NAME --region $REGION --query 'Configuration.LastUpdateStatus' --output text)
+            if [ "$UPDATE_STATUS" == "Successful" ]; then
+              echo "Function code update completed successfully."
+              break
+            elif [ "$UPDATE_STATUS" == "Failed" ]; then
+              echo "Function code update failed."
+              exit 1
+            else
+              echo "Update in progress, waiting..."
+              sleep 5
+            fi
+          done
+
+          # Update function configuration
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --region $REGION \
