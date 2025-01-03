@@ -1,3 +1,0 @@
-ENV: test
-API_KEY: test_api_key
-LOG_LEVEL: DEBUG
