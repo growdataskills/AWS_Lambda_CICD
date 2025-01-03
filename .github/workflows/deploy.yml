@@ -20,16 +20,6 @@ jobs:
         sudo apt-get install -y python3-pip jq zip
         pip3 install boto3
 
-    - name: Package Lambda Function
-      run: |
-        cd lambda_function
-        mkdir package
-        pip3 install -r requirements.txt -t ./package
-        cp app.py ./package/  # Copy the Lambda handler to the package directory
-        cd package
-        zip -r ../lambda.zip .  # Create a zip file containing all dependencies and the handler
-        cd ..
-
     - name: Set environment variables
       id: set-env-vars
       run: |
@@ -38,6 +28,16 @@ jobs:
         else
           echo "ENV=test,API_KEY=test_api_key,LOG_LEVEL=DEBUG" >> $GITHUB_ENV
         fi
+
+    - name: Package Lambda Function
+      run: |
+        cd lambda_function
+        mkdir package
+        pip3 install -r requirements.txt -t ./package
+        cp app.py ./package/
+        cd package
+        zip -r ../../lambda.zip .
+        cd ../..
 
     - name: Deploy to AWS Lambda
       env:
@@ -61,7 +61,7 @@ jobs:
             --role arn:aws:iam::851725469799:role/service-role/test_function-role-k06sk5ka \
             --handler app.lambda_handler \
             --timeout 300 \
-            --zip-file fileb://lambda.zip \
+            --zip-file fileb://$(pwd)/lambda.zip \
             --region $REGION \
             --environment Variables={$ENV_VARS}
         else
@@ -69,7 +69,7 @@ jobs:
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --zip-file fileb://lambda.zip
+            --zip-file fileb://$(pwd)/lambda.zip
 
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
