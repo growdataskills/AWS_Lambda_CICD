@@ -37,6 +37,7 @@ jobs:
           echo "ENV=prod,API_KEY=prod_api_key,LOG_LEVEL=INFO" >> $GITHUB_ENV
         else
           echo "ENV=test,API_KEY=test_api_key,LOG_LEVEL=DEBUG" >> $GITHUB_ENV
+        fi
 
     - name: Deploy to AWS Lambda
       env:
