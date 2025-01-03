@@ -36,9 +36,9 @@ jobs:
           echo "Error: Environment file $ENV_FILE not found."
           exit 1
         fi
-        # Convert YAML to JSON and store as environment variables
-        ENV_VARS_JSON=$(yq eval -o=json "$ENV_FILE")
-        echo "env_vars=$ENV_VARS_JSON" >> $GITHUB_ENV
+        # Convert YAML to environment variable format for AWS CLI
+        ENV_VARS_CLI=$(yq eval '. | to_entries | map(.key + "=" + .value) | join(",")' "$ENV_FILE")
+        echo "env_vars_cli=$ENV_VARS_CLI" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
       run: |
@@ -57,7 +57,7 @@ jobs:
             --handler app.lambda_handler \
             --timeout 300 \
             --zip-file fileb://lambda.zip \
-            --environment "Variables=$env_vars"
+            --environment "Variables={$env_vars_cli}"
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -66,10 +66,10 @@ jobs:
 
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
-            --environment "Variables=$env_vars"
+            --environment "Variables={$env_vars_cli}"
         fi
 
     - name: Debug environment variables (optional)
       if: ${{ always() }}
       run: |
-        echo "Environment variables: $env_vars"
+        echo "Environment variables for AWS CLI: $env_vars_cli"
