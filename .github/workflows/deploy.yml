@@ -17,8 +17,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip jq
-        pip3 install awscli zip
+        sudo apt-get install -y python3-pip jq zip
+        pip3 install boto3 yq
 
     - name: Install Python dependencies
       run: |
@@ -35,7 +35,6 @@ jobs:
           echo "Error: Environment file $ENV_FILE not found."
           exit 1
         fi
-
         # Convert YAML to AWS CLI-compatible environment variable format
         ENV_VARS_CLI=$(yq eval -o=json "$ENV_FILE" | jq -r '. | to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
         echo "ENV_VARS=$ENV_VARS_CLI" >> $GITHUB_ENV
