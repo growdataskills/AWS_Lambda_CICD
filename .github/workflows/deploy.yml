@@ -17,8 +17,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip
-        pip3 install yq awscli zip
+        sudo apt-get install -y python3-pip zip
+        pip3 install yq awscli
 
     - name: Install Python dependencies
       run: |
