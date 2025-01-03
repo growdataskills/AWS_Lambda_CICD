@@ -17,12 +17,13 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip
-        pip3 install yq awscli zip
+        sudo apt-get install -y python3-pip zip
+        pip3 install yq awscli
 
     - name: Install Python dependencies
       run: |
         cd lambda_function
+        pip3 install --upgrade pip setuptools wheel
         pip3 install -r requirements.txt -t ./
         zip -r ../lambda.zip .
         cd ..
@@ -35,8 +36,8 @@ jobs:
           echo "Error: Environment file $ENV_FILE not found."
           exit 1
         fi
-        # Convert YAML to JSON and store it as environment variables
-        ENV_VARS_JSON=$(yq eval -j "$ENV_FILE")
+        # Convert YAML to JSON and store as environment variables
+        ENV_VARS_JSON=$(yq eval -o=json "$ENV_FILE")
         echo "env_vars=$ENV_VARS_JSON" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
