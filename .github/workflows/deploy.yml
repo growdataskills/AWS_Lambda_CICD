@@ -44,7 +44,9 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: us-east-1
-        ENV_VARS: ${{ env.ENV_VARS }}
+        ENV_VARS: ${{ env.ENV }}
+        API_KEY: ${{ env.API_KEY }}
+        LOG_LEVEL: ${{ env.LOG_LEVEL }}
       run: |
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
         REGION="us-east-1"
@@ -63,7 +65,7 @@ jobs:
             --timeout 300 \
             --zip-file fileb://lambda.zip \
             --region $REGION \
-            --environment Variables={$ENV_VARS}
+            --environment Variables="{ENV=$ENV_VARS,API_KEY=$API_KEY,LOG_LEVEL=$LOG_LEVEL}"
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -91,5 +93,5 @@ jobs:
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --environment Variables={$ENV_VARS}
+            --environment Variables="{ENV=$ENV_VARS,API_KEY=$API_KEY,LOG_LEVEL=$LOG_LEVEL}"
         fi
