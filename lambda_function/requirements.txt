@@ -1,3 +1,2 @@
-libopenblas-dev
 requests
 pandas
