@@ -17,8 +17,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip
-        pip3 install yq awscli zip
+        sudo apt-get install -y python3-pip jq
+        pip3 install awscli zip
 
     - name: Install Python dependencies
       run: |
@@ -36,15 +36,16 @@ jobs:
           exit 1
         fi
 
-        # Convert YAML to AWS CLI-compatible format
+        # Convert YAML to AWS CLI-compatible environment variable format
         ENV_VARS_CLI=$(yq eval -o=json "$ENV_FILE" | jq -r '. | to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
-        echo "env_vars_cli=Variables={$ENV_VARS_CLI}" >> $GITHUB_ENV
+        echo "ENV_VARS=$ENV_VARS_CLI" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: us-east-1
+        ENV_VARS: ${{ env.ENV_VARS }}
       run: |
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
         REGION="us-east-1"
@@ -63,7 +64,7 @@ jobs:
             --timeout 300 \
             --zip-file fileb://lambda.zip \
             --region $REGION \
-            --environment "$env_vars_cli"
+            --environment Variables={$ENV_VARS}
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -74,5 +75,5 @@ jobs:
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --environment "$env_vars_cli"
+            --environment Variables={$ENV_VARS}
         fi
