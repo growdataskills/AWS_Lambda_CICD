@@ -36,12 +36,14 @@ jobs:
           echo "Error: Environment file $ENV_FILE not found."
           exit 1
         fi
-        # Convert YAML to environment variable format for AWS CLI
-        ENV_VARS_CLI=$(yq eval -j "$ENV_FILE" | jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
+
+        # Convert YAML to JSON and then to AWS CLI format
+        ENV_VARS_CLI=$(cat "$ENV_FILE" | yq eval -j - | jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
         echo "env_vars_cli=$ENV_VARS_CLI" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
       run: |
+        REGION="us-east-1"
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
         echo "Deploying to Lambda function: $FUNCTION_NAME"
 
@@ -56,16 +58,19 @@ jobs:
             --role arn:aws:iam::851725469799:role/service-role/test_function-role-k06sk5ka \
             --handler app.lambda_handler \
             --timeout 300 \
+            --region $REGION \
             --zip-file fileb://lambda.zip \
             --environment "Variables={$env_vars_cli}"
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
+            --region $REGION \
             --zip-file fileb://lambda.zip
 
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
+            --region $REGION \
             --environment "Variables={$env_vars_cli}"
         fi
 
