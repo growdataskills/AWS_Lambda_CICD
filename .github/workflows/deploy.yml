@@ -17,38 +17,33 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip jq zip
-        pip3 install boto3
+        sudo apt-get install -y python3-pip jq
+        pip3 install awscli zip
 
-    - name: Install Python dependencies and Package Lambda
+    - name: Package Lambda Function
       run: |
         cd lambda_function
-        pip3 install -r requirements.txt -t ./
-        rm -rf numpy/.*
-        rm -rf pandas/.*
-        zip -r ../lambda.zip .
+        mkdir package
+        pip3 install -r requirements.txt -t ./package
+        cp app.py ./package/  # Copy the Lambda handler to the package directory
+        cd package
+        zip -r ../lambda.zip .  # Create a zip file containing all dependencies and the handler
         cd ..
 
     - name: Set environment variables
       id: set-env-vars
       run: |
         if [[ "${{ github.ref_name }}" == "main" ]]; then
-          echo "ENV=test" >> $GITHUB_ENV
-          echo "API_KEY=prod_api_key" >> $GITHUB_ENV
-          echo "LOG_LEVEL=INFO" >> $GITHUB_ENV
+          echo "ENV=prod,API_KEY=prod_api_key,LOG_LEVEL=INFO" >> $GITHUB_ENV
         else
-          echo "ENV=test" >> $GITHUB_ENV
-          echo "API_KEY=test_api_key" >> $GITHUB_ENV
-          echo "LOG_LEVEL=DEBUG" >> $GITHUB_ENV
+          echo "ENV=test,API_KEY=test_api_key,LOG_LEVEL=DEBUG" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: us-east-1
-        ENV: ${{ env.ENV }}
-        API_KEY: ${{ env.API_KEY }}
-        LOG_LEVEL: ${{ env.LOG_LEVEL }}
+        ENV_VARS: ${{ env.ENV_VARS }}
       run: |
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
         REGION="us-east-1"
@@ -67,7 +62,7 @@ jobs:
             --timeout 300 \
             --zip-file fileb://lambda.zip \
             --region $REGION \
-            --environment Variables="{ENV=${ENV},API_KEY=${API_KEY},LOG_LEVEL=${LOG_LEVEL}}"
+            --environment Variables={$ENV_VARS}
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -78,5 +73,5 @@ jobs:
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --environment Variables="{ENV=${ENV},API_KEY=${API_KEY},LOG_LEVEL=${LOG_LEVEL}}"
+            --environment Variables={$ENV_VARS}
         fi
