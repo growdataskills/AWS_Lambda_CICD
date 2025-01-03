@@ -33,13 +33,24 @@ jobs:
           echo "LOG_LEVEL=DEBUG" >> $GITHUB_ENV
         fi
 
+    # - name: Package Lambda Function
+    #   run: |
+    #     cd lambda_function
+    #     mkdir package
+    #     pip3 install -r requirements.txt -t ./package
+    #     cp app.py ./package/
+    #     cd package
+    #     zip -r ../../lambda.zip .
+    #     cd ../..
+
     - name: Package Lambda Function
       run: |
         cd lambda_function
         mkdir package
-        pip3 install -r requirements.txt -t ./package
+        pip3 install -r requirements.txt --platform manylinux2014_x86_64 --only-binary=:all: -t ./package
         cp app.py ./package/
         cd package
+        find . -type d -name '__pycache__' -exec rm -r {} +
         zip -r ../../lambda.zip .
         cd ../..
 
