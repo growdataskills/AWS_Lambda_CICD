@@ -17,13 +17,12 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip zip
-        pip3 install yq awscli
+        sudo apt-get install -y python3-pip
+        pip3 install yq awscli zip
 
     - name: Install Python dependencies
       run: |
         cd lambda_function
-        pip3 install --upgrade pip setuptools wheel
         pip3 install -r requirements.txt -t ./
         zip -r ../lambda.zip .
         cd ..
@@ -37,31 +36,19 @@ jobs:
           exit 1
         fi
 
-        # Convert YAML to JSON using yq
-        ENV_VARS_JSON=$(yq eval -o=json "$ENV_FILE")
-        if [ -z "$ENV_VARS_JSON" ]; then
-          echo "Error: Failed to parse $ENV_FILE."
-          exit 1
-        fi
-
-        # Convert JSON to AWS CLI-friendly format
-        ENV_VARS_CLI=$(echo "$ENV_VARS_JSON" | jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
-        if [ -z "$ENV_VARS_CLI" ]; then
-          echo "Error: Failed to convert JSON to CLI format."
-          exit 1
-        fi
-
-        echo "env_vars_cli=$ENV_VARS_CLI" >> $GITHUB_ENV
+        # Convert YAML to AWS CLI-compatible format
+        ENV_VARS_CLI=$(yq eval -o=json "$ENV_FILE" | jq -r '. | to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
+        echo "env_vars_cli=Variables={$ENV_VARS_CLI}" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: "us-east-1"
+        AWS_DEFAULT_REGION: us-east-1
       run: |
-        REGION="us-east-1"
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
-        echo "Deploying to Lambda function: $FUNCTION_NAME in region $REGION"
+        REGION="us-east-1"
+        echo "Deploying to Lambda function: $FUNCTION_NAME"
 
         # Check if the Lambda function exists
         FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME --region $REGION || echo "false")
@@ -74,9 +61,9 @@ jobs:
             --role arn:aws:iam::851725469799:role/service-role/test_function-role-k06sk5ka \
             --handler app.lambda_handler \
             --timeout 300 \
-            --region $REGION \
             --zip-file fileb://lambda.zip \
-            --environment "Variables={$env_vars_cli}"
+            --region $REGION \
+            --environment "$env_vars_cli"
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -87,5 +74,5 @@ jobs:
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --environment "Variables={$env_vars_cli}"
+            --environment "$env_vars_cli"
         fi
