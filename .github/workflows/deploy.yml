@@ -1,56 +1,49 @@
-name: Lambda CICD Deployment
+name: Deploy Lambda
 
 on:
   push:
     branches:
-      - test
       - main
+      - test
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # Step 1: Checkout Code
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # Step 2: Set Up Python Environment
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: "3.9"
-
-    # Step 3: Install Dependencies
     - name: Install dependencies
       run: |
-        cd lambda_function
-        pip install -r requirements.txt -t .
+        sudo apt-get update
+        sudo apt-get install -y python3-pip
+        pip3 install yq awscli zip
 
-    # Step 4: Install jq
-    - name: Install jq
-      run: sudo apt-get install -y jq
-
-    # Step 5: Package Lambda Function
-    - name: Package Lambda Function
+    - name: Install Python dependencies
       run: |
         cd lambda_function
+        pip3 install -r requirements.txt -t ./
         zip -r ../lambda.zip .
+        cd ..
 
-    # Step 6: Deploy to AWS Lambda
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v3
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+    - name: Set environment variables
+      id: set-env-vars
+      run: |
+        ENV_FILE="environment_variables/${{ github.ref_name }}.yml"
+        if [ ! -f "$ENV_FILE" ]; then
+          echo "Error: Environment file $ENV_FILE not found."
+          exit 1
+        fi
+        ENV_VARS_JSON=$(yq e -o=json "$ENV_FILE")
+        echo "env_vars=$ENV_VARS_JSON" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
       run: |
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
-        ENV_FILE="environment_variables/${{ github.ref_name }}.json"
+        echo "Deploying to Lambda function: $FUNCTION_NAME"
 
-        # Check if Lambda function exists
+        # Check if the Lambda function exists
         FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME || echo "false")
 
         if [ "$FUNCTION_EXISTS" == "false" ]; then
@@ -62,7 +55,7 @@ jobs:
             --handler app.lambda_handler \
             --timeout 300 \
             --zip-file fileb://lambda.zip \
-            --environment Variables="$(cat $ENV_FILE | jq -c .)"
+            --environment Variables="$env_vars"
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -71,5 +64,5 @@ jobs:
 
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
-            --environment Variables="$(cat $ENV_FILE | jq -c .)"
+            --environment Variables="$env_vars"
         fi
