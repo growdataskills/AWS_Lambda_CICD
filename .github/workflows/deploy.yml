@@ -24,9 +24,13 @@ jobs:
       id: set-env-vars
       run: |
         if [[ "${{ github.ref_name }}" == "main" ]]; then
-          echo "ENV=prod,API_KEY=prod_api_key,LOG_LEVEL=INFO" >> $GITHUB_ENV
+          echo "ENV=prod" >> $GITHUB_ENV
+          echo "API_KEY=prod_api_key" >> $GITHUB_ENV
+          echo "LOG_LEVEL=INFO" >> $GITHUB_ENV
         else
-          echo "ENV=test,API_KEY=test_api_key,LOG_LEVEL=DEBUG" >> $GITHUB_ENV
+          echo "ENV=test" >> $GITHUB_ENV
+          echo "API_KEY=test_api_key" >> $GITHUB_ENV
+          echo "LOG_LEVEL=DEBUG" >> $GITHUB_ENV
         fi
 
     - name: Package Lambda Function
@@ -44,9 +48,6 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: us-east-1
-        ENV_VARS: ${{ env.ENV }}
-        API_KEY: ${{ env.API_KEY }}
-        LOG_LEVEL: ${{ env.LOG_LEVEL }}
       run: |
         FUNCTION_NAME="cicd_lambda_${{ github.ref_name }}"
         REGION="us-east-1"
@@ -54,6 +55,8 @@ jobs:
 
         # Check if the Lambda function exists
         FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME --region $REGION || echo "false")
+
+        ENV_VARS="Variables={ENV=${{ env.ENV }},API_KEY=${{ env.API_KEY }},LOG_LEVEL=${{ env.LOG_LEVEL }}}"
 
         if [ "$FUNCTION_EXISTS" == "false" ]; then
           echo "Creating Lambda function $FUNCTION_NAME..."
@@ -65,7 +68,7 @@ jobs:
             --timeout 300 \
             --zip-file fileb://lambda.zip \
             --region $REGION \
-            --environment Variables="{ENV=$ENV_VARS,API_KEY=$API_KEY,LOG_LEVEL=$LOG_LEVEL}"
+            --environment "$ENV_VARS"
         else
           echo "Updating Lambda function $FUNCTION_NAME..."
           aws lambda update-function-code \
@@ -93,5 +96,5 @@ jobs:
           aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --region $REGION \
-            --environment Variables="{ENV=$ENV_VARS,API_KEY=$API_KEY,LOG_LEVEL=$LOG_LEVEL}"
+            --environment "$ENV_VARS"
         fi
