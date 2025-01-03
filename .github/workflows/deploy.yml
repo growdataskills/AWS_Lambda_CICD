@@ -37,7 +37,7 @@ jobs:
           exit 1
         fi
         # Convert YAML to environment variable format for AWS CLI
-        ENV_VARS_CLI=$(yq eval '. | to_entries | map(.key + "=" + .value) | join(",")' "$ENV_FILE")
+        ENV_VARS_CLI=$(yq eval -j "$ENV_FILE" | jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | join(",")')
         echo "env_vars_cli=$ENV_VARS_CLI" >> $GITHUB_ENV
 
     - name: Deploy to AWS Lambda
